@@ -1,0 +1,247 @@
+<%- include('partials/header', { cart, cartItemCount, selectedCategory }) %>
+
+<main class="container">
+  <section class="welcome-section">
+    <div class="welcome-text">
+      <h3>PMusicShop</h3>
+      <p>Vaš vodič kroz svijet glazbe!</p>
+    </div>
+    <div class="hero-image">
+      <img src="/images/boy-playing-electric-guitar.jpg" alt="Music shop" />
+    </div>
+  </section>
+  <div class="content-layout">
+    <aside class="sidebar-container">
+      <div class="sidebar-categories">
+        <nav>
+          <ul id="sidebar-categories">
+            <% categories.forEach((category, index) => { %>
+              <li>
+                <a 
+                  href="/home/category/<%= encodeURIComponent(category.name) %>" 
+                  class="category-link <%= selectedCategory && selectedCategory.name === category.name ? 'active' : '' %>" 
+                  data-category-name="<%= category.name %>">
+                  <%= category.name %>
+                </a>
+              </li>
+            <% }); %>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="contact-section">
+        <h3>Kontakt:</h3>
+        <h4>096 400 2340</h4>
+        <h4>github.com/lspajic</h4>
+        <button class="subscribe-btn">Preplati se</button>
+      </div>
+    </aside>
+
+    <section class="main-content">
+      <div id="product-list" class="products-grid">
+        <% if (selectedCategory && selectedCategory.products) { %>
+          <% selectedCategory.products.forEach(product => { 
+               const quantity = cart[product.name] || 0;
+          %>
+            <div class="product-card" style="position: relative;">
+              <% if (quantity > 0) { %>
+                <div class="numberCircle"><%= quantity %></div>
+              <% } %>
+
+              <img src="<%= product.image %>" alt="<%= product.name %>" class="product-image" />
+
+              <div class="product-info">
+                <h3 class="product-name"><%= product.name %></h3>
+                <p class="product-category"><%= selectedCategory.name %></p>
+              </div>
+
+              <form class="add-to-cart-form" action="/cart/add/<%= encodeURIComponent(product.name) %>" method="post"
+                    data-product-name="<%= product.name %>" data-product-category="<%= selectedCategory.name %>">
+                <input type="hidden" name="category" value="<%= selectedCategory.name %>" />
+                <button type="submit" class="add-to-cart" data-product="<%= product.name %>"></button>
+              </form>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <p>No products found in this category.</p>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+  const categoryLinks = document.querySelectorAll('.category-link');
+  const productList = document.getElementById('product-list');
+  const headerTitle = document.querySelector('.current-category h1');
+  const cartCounter = document.getElementById('cart-counter');
+
+  // Parse cart JSON passed from server
+  let cart = <%- JSON.stringify(cart || {}) %>;
+
+  // Render products with quantity circles
+  function renderProducts(products, categoryName) {
+    if (!products.length) {
+      productList.innerHTML = '<p>No products found in this category.</p>';
+      return;
+    }
+    productList.innerHTML = products.map(product => {
+      const quantity = cart[product.name] || 0;
+      return `
+        <div class="product-card" style="position: relative;">
+          ${quantity > 0 ? `<div class="numberCircle">${quantity}</div>` : ''}
+          <img src="${product.image}" alt="${product.name}" class="product-image" />
+          <div class="product-info">
+            <h3 class="product-name">${product.name}</h3>
+            <p class="product-category">${categoryName}</p>
+            <form class="add-to-cart-form" action="/cart/add/${encodeURIComponent(product.name)}" method="post" 
+                  data-product-name="${product.name}" data-product-category="${categoryName}">
+              <input type="hidden" name="category" value="${categoryName}" />
+              <button type="submit" class="add-to-cart"></button>
+            </form>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Update quantity circles on all visible product cards from cart data
+  function updateQuantityCircles() {
+    const cards = document.querySelectorAll('.product-card');
+    cards.forEach(card => {
+      const nameElem = card.querySelector('.product-name');
+      if (!nameElem) return;
+      const productName = nameElem.textContent;
+      const quantity = cart[productName] || 0;
+
+      let numberCircle = card.querySelector('.numberCircle');
+      if (quantity > 0) {
+        if (!numberCircle) {
+          numberCircle = document.createElement('div');
+          numberCircle.className = 'numberCircle';
+          card.style.position = 'relative';
+          card.insertBefore(numberCircle, card.firstChild);
+        }
+        numberCircle.textContent = quantity;
+      } else {
+        if (numberCircle) {
+          numberCircle.remove();
+        }
+      }
+    });
+  }
+
+  // Switch category and fetch products
+  categoryLinks.forEach(link => {
+    link.addEventListener('click', async e => {
+      e.preventDefault();
+
+      const categoryName = link.dataset.categoryName.trim();
+
+      categoryLinks.forEach(l => l.classList.remove('active'));
+      link.classList.add('active');
+
+      if (headerTitle) headerTitle.textContent = categoryName;
+
+      try {
+        const res = await fetch(`/home/getProducts/${encodeURIComponent(categoryName)}`);
+        if (!res.ok) throw new Error('Error fetching products');
+        const products = await res.json();
+        renderProducts(products, categoryName);
+      } catch (err) {
+        console.error(err);
+        productList.innerHTML = '<p>Greška pri dohvaćanju proizvoda.</p>';
+      }
+    });
+  });
+
+  // Add to cart form handler via AJAX
+  document.body.addEventListener('submit', async e => {
+    if (e.target.matches('.add-to-cart-form')) {
+      e.preventDefault();
+
+      const form = e.target;
+      const productName = form.dataset.productName;
+      const category = form.dataset.productCategory;
+
+      try {
+        const res = await fetch(`/cart/add/${encodeURIComponent(productName)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ category })
+        });
+        if (!res.ok) throw new Error('Failed to add to cart');
+
+        cart[productName] = (cart[productName] || 0) + 1;
+
+        if (cartCounter) {
+          const totalCount = Object.values(cart).reduce((a, b) => a + b, 0);
+          cartCounter.textContent = totalCount;
+          cartCounter.classList.toggle('hidden', totalCount === 0);
+        }
+
+        updateQuantityCircles();
+      } catch (err) {
+        console.error('Error adding to cart:', err);
+        alert('Greška pri dodavanju u košaricu.');
+      }
+    }
+  });
+
+  // Initialize cart counter and quantity circles on load
+  if (cartCounter) {
+    const totalCount = Object.values(cart).reduce((a, b) => a + b, 0);
+    cartCounter.textContent = totalCount;
+    cartCounter.classList.toggle('hidden', totalCount === 0);
+  }
+  updateQuantityCircles();
+});
+
+// Refresh cart data & counters on page show (including back button)
+window.addEventListener('pageshow', event => {
+  if (event.persisted) {
+    // Fetch updated cart data (including quantities)
+    fetch('/cart/data') // <-- Make sure your server returns full cart object here
+      .then(res => res.json())
+      .then(data => {
+        cart = data.cart || {}; // update global cart variable
+
+        const cartCounter = document.getElementById('cart-counter');
+        if (cartCounter) {
+          const count = Object.values(cart).reduce((a, b) => a + b, 0);
+          cartCounter.textContent = count;
+          cartCounter.classList.toggle('hidden', count === 0);
+        }
+
+        // Update all quantity circles on visible products
+        const cards = document.querySelectorAll('.product-card');
+        cards.forEach(card => {
+          const nameElem = card.querySelector('.product-name');
+          if (!nameElem) return;
+          const productName = nameElem.textContent;
+          const quantity = cart[productName] || 0;
+
+          let numberCircle = card.querySelector('.numberCircle');
+          if (quantity > 0) {
+            if (!numberCircle) {
+              numberCircle = document.createElement('div');
+              numberCircle.className = 'numberCircle';
+              card.style.position = 'relative';
+              card.insertBefore(numberCircle, card.firstChild);
+            }
+            numberCircle.textContent = quantity;
+          } else {
+            if (numberCircle) {
+              numberCircle.remove();
+            }
+          }
+        });
+      })
+      .catch(err => console.error('Failed to refresh cart data:', err));
+  }
+});
+
+</script>
+
+<%- include('partials/footer') %>
