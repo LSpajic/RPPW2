@@ -15,7 +15,7 @@ router.get('/', (req, res) => {
   const cartItems = Object.entries(cart)
     .map(([name, quantity]) => {
       const product = allProducts.find(p => p.name === name);
-      return product ? { ...product, quantity } : null;
+      retur7n product ? { ...product, quantity } : null;
     })
     .filter(Boolean);
 
