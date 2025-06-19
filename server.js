@@ -3,7 +3,6 @@ const session = require('express-session');
 const path = require('path');
 const os = require('os');
 const app = express();
-
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));

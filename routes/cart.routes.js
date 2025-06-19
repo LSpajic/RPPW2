@@ -15,7 +15,7 @@ router.get('/', (req, res) => {
   const cartItems = Object.entries(cart)
     .map(([name, quantity]) => {
       const product = allProducts.find(p => p.name === name);
-      retur7n product ? { ...product, quantity } : null;
+      return product ? { ...product, quantity } : null;
     })
     .filter(Boolean);
 
@@ -27,6 +27,22 @@ router.get('/', (req, res) => {
     cartItemCount
   });
 });
+
+// GET /cart/getAll - Return all products with their quantities for the current session's cart
+router.get('/getAll', (req, res) => {
+  const cart = req.session.cart || {};
+  const allProducts = getAllProducts();
+
+  const cartItems = Object.entries(cart)
+    .map(([name, quantity]) => {
+      const product = allProducts.find(p => p.name === name);
+      return product ? { ...product, quantity } : null;
+    })
+    .filter(Boolean);
+
+  res.json({ cartItems });
+});
+
 
 // POST /cart/add/:name - Add one quantity of a product, respond with updated cart info (JSON)
 router.post('/add/:name', (req, res) => {
@@ -43,7 +59,7 @@ router.post('/add/:name', (req, res) => {
 });
 
 // POST /cart/remove/:name - Remove one quantity of a product, respond with updated cart info (JSON)
-router.post('/remove/:name', (req, res) => {
+router.delete('/remove/:name', (req, res) => {
   const name = decodeURIComponent(req.params.name);
 
   if (req.session.cart && req.session.cart[name]) {
